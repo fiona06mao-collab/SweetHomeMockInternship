@@ -2002,12 +2002,93 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
     }
     return strokeWidth;
   }
-  
+
+  /**
+   * Returns the viewable levels of this home.
+   */
+  private List<Level> getPrintableLevels() {
+    List<Level> printableLevels = new ArrayList<Level>();
+
+    for (Level level : this.home.getLevels()) {
+      if (level.isViewable()) {
+        printableLevels.add(level);
+      }
+    }
+
+    return printableLevels;
+  }
+
+  /**
+   * Prints the plan of each viewable level.
+   */
+  public int print(Graphics g, PageFormat pageFormat, int pageIndex) {
+    List<Level> printableLevels = getPrintableLevels();
+
+    if (printableLevels.isEmpty()) {
+      return printSelectedLevel(g, pageFormat, pageIndex);
+    }
+
+    Level originalLevel = this.home.getSelectedLevel();
+
+    try {
+      int remainingPageIndex = pageIndex;
+
+      for (Level level : printableLevels) {
+        this.home.setSelectedLevel(level);
+
+        int levelPageCount =
+                getSelectedLevelPageCount(g, pageFormat);
+
+        if (remainingPageIndex < levelPageCount) {
+          return printSelectedLevel(
+                  g, pageFormat, remainingPageIndex);
+        }
+
+        remainingPageIndex -= levelPageCount;
+      }
+
+      return NO_SUCH_PAGE;
+    } finally {
+      this.home.setSelectedLevel(originalLevel);
+    }
+  }
+
+  /**
+   * Returns the number of printable pages for the selected level.
+   */
+  private int getSelectedLevelPageCount(Graphics g,
+                                        PageFormat pageFormat) {
+    List<Selectable> printedItems = getPaintedItems();
+    Rectangle2D bounds = getItemsBounds(g, printedItems);
+
+    if (bounds == null) {
+      return 0;
+    }
+
+    if (this.home.getPrint() == null
+            || this.home.getPrint().getPlanScale() == null) {
+      return 1;
+    }
+
+    float printScale = this.home.getPrint().getPlanScale()
+            .floatValue() * LengthUnit.centimeterToInch(72);
+
+    int pagesPerRow = (int)Math.ceil(
+            bounds.getWidth() * printScale
+                    / pageFormat.getImageableWidth());
+
+    int pagesPerColumn = (int)Math.ceil(
+            bounds.getHeight() * printScale
+                    / pageFormat.getImageableHeight());
+
+    return pagesPerRow * pagesPerColumn;
+  }
+
   /**
    * Prints this component plan at the scale given in the home print attributes or at a scale 
    * that makes it fill <code>pageFormat</code> imageable size if this attribute is <code>null</code>.
    */
-  public int print(Graphics g, PageFormat pageFormat, int pageIndex) {
+  public int printSelectedLevel(Graphics g, PageFormat pageFormat, int pageIndex) {
     List<Selectable> printedItems = getPaintedItems(); 
     Rectangle2D printedItemBounds = getItemsBounds(g, printedItems);
     if (printedItemBounds != null) {
